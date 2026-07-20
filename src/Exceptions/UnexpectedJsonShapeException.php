@@ -12,6 +12,10 @@ use JsonException;
  */
 final class UnexpectedJsonShapeException extends JsonException
 {
+    /**
+     * @internal the wording of $expected is not a compatibility promise; catch the
+     *           exception rather than constructing it
+     */
     public static function expected(string $expected, mixed $actual): self
     {
         return new self("Expected the JSON to decode to {$expected}, got " . get_debug_type($actual) . '.');
