@@ -21,7 +21,7 @@ Requires PHP 8.3+. No runtime dependencies.
 
 ## Usage
 
-Every method throws on malformed input — there is no silent `false` or `null` to forget to check.
+Every method throws on malformed input — there is no silent `false` or `null` to forget to check. The two flags that would undermine that (`JSON_PARTIAL_OUTPUT_ON_ERROR` on encode, `JSON_OBJECT_AS_ARRAY` on decode) are rejected rather than silently ignored.
 
 ```php
 use SanderMuller\Json\Json;
@@ -62,6 +62,10 @@ try {
 }
 ```
 
+Passing an unsupported flag throws `UnsupportedJsonFlagException`, which extends `InvalidArgumentException` — deliberately *not* a `JsonException`, because it means the call is wrong, not the data.
+
+Note that the reported type is the type the JSON *decoded to*, which a flag can shift: `Json::int('123…', JSON_BIGINT_AS_STRING)` reports `got string` even though the JSON held an integer.
+
 ### Flags and depth
 
 Both are passthroughs, positioned so the common case stays short. `JSON_THROW_ON_ERROR` is always added on top of whatever you pass:
@@ -72,6 +76,15 @@ Json::encode($value, JSON_UNESCAPED_UNICODE);
 Json::decode($raw, depth: 8);
 ```
 
+Two flags are rejected instead of honoured, because both would reintroduce a silent failure:
+
+| Flag | Why |
+|---|---|
+| `JSON_PARTIAL_OUTPUT_ON_ERROR` (encode) | Suppresses `JSON_THROW_ON_ERROR`, returning a string with unencodable values replaced by `null`. |
+| `JSON_OBJECT_AS_ARRAY` (decode) | Each method fixes its own object representation, so the flag could only ever be discarded. |
+
+`$depth` below `1` is a programming error: encode throws `JsonException`, decode throws `ValueError` (PHP's own behaviour in each case; the package does not paper over the difference).
+
 ## Replacing `GuzzleHttp\Utils`
 
 | Deprecated | Replacement |
@@ -81,7 +94,11 @@ Json::decode($raw, depth: 8);
 | `Utils::jsonDecode($j)` | `Json::decode($j)` — or `Json::object($j)` when it is always an object |
 | `Utils::jsonDecode($j, true)` | `Json::array($j)` |
 
-Guzzle threw `GuzzleHttp\Exception\InvalidArgumentException` (which extends the SPL `InvalidArgumentException`); this package throws `JsonException`. Update `catch` blocks accordingly — that is the only behavioural difference.
+Two differences to port carefully:
+
+**The second argument changed meaning.** Guzzle's was `bool $assoc`; here it is `int $flags`. `Json::decode($json, true)` is therefore *not* the port of `Utils::jsonDecode($json, true)` — use `Json::array($json)`. From a caller without `declare(strict_types=1)`, that `true` would otherwise coerce to `1` (`JSON_OBJECT_AS_ARRAY`) and quietly hand back a `stdClass`. That exact flag is rejected with an error message naming the correct replacement, so the mistake fails loudly instead.
+
+**The exception type changed.** Guzzle threw `GuzzleHttp\Exception\InvalidArgumentException` (an SPL `InvalidArgumentException`); this package throws `JsonException`. Update `catch` blocks accordingly.
 
 ## Testing
 
