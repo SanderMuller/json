@@ -42,7 +42,7 @@ Json::string('"hi"');         // string
 Json::int('42');              // int
 Json::float('4.2');           // float  (ints are widened)
 Json::bool('true');           // bool
-Json::decode('…');            // mixed  (when the shape is genuinely unknown)
+Json::decode($raw);           // mixed  (when the shape is genuinely unknown)
 ```
 
 `Json::list()` is the one that pays for itself under PHPStan: `json_decode($json, true)` gives you `array`, which is not a `list`, so a `@return list<T>` signature forces a redundant `array_values()`. `Json::list()` returns `list<mixed>` directly.
@@ -64,7 +64,7 @@ try {
 
 Passing an unsupported flag throws `UnsupportedJsonFlagException`, which extends `InvalidArgumentException`. It is deliberately *not* a `JsonException`, because it means the call is wrong, not the data.
 
-The reported type is the type the JSON *decoded to*, which a flag can shift: `Json::int('123…', JSON_BIGINT_AS_STRING)` reports `got string` even though the JSON held an integer.
+The reported type is the type the JSON *decoded to*, which a flag can shift: `Json::int('9223372036854775808', JSON_BIGINT_AS_STRING)` reports `got string` even though the JSON held an integer.
 
 ### Flags and depth
 
