@@ -1,0 +1,94 @@
+{
+    "name": "sandermuller/json",
+    "description": "Typed JSON encoding and decoding for PHP with strict error handling and shape assertions.",
+    "keywords": [
+        "sandermuller",
+        "json",
+        "php"
+    ],
+    "homepage": "https://github.com/sandermuller/json",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Sander Muller",
+            "email": "github@scode.nl",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.3"
+    },
+    "require-dev": {
+        "laravel/pao": "^1.0",
+        "laravel/pint": "^1.29",
+        "mrpunyapal/rector-pest": "^0.2",
+        "nunomaduro/collision": "^8.0",
+        "orchestra/testbench": "^10.0||^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-arch": "^4.0",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.0",
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "rector/rector": "^2.4",
+        "rector/type-perfect": "^2.1",
+        "sandermuller/boost-skills": "^2.0.0",
+        "sandermuller/package-boost-php": "^1.0",
+        "spaze/phpstan-disallowed-calls": "^4.10",
+        "stolt/lean-package-validator": "^5.7",
+        "symplify/phpstan-extensions": "^12.0",
+        "tomasvotruba/cognitive-complexity": "^1.1",
+        "tomasvotruba/type-coverage": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "SanderMuller\\Json\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SanderMuller\\Json\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "SanderMuller\\PackageBoostPhp\\Scripts\\AutoSync::run"
+        ],
+        "post-update-cmd": [
+            "SanderMuller\\PackageBoostPhp\\Scripts\\AutoSync::run"
+        ],
+        "phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",
+        "phpstan-simplified": "vendor/bin/phpstan analyse --memory-limit=2G --error-format symplify",
+        "phpstan-clear-cache": "vendor/bin/phpstan clear-result-cache",
+        "format": "vendor/bin/pint",
+        "rector": "vendor/bin/rector process",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "sync-ai": "vendor/bin/boost sync",
+        "validate-gitattributes": "vendor/bin/lean-package-validator validate",
+        "qa": [
+            "@rector",
+            "@format",
+            "@phpstan-simplified",
+            "@validate-gitattributes"
+        ],
+        "qa-check": [
+            "vendor/bin/rector process --dry-run",
+            "vendor/bin/pint --test",
+            "@phpstan-simplified",
+            "@validate-gitattributes",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
