@@ -22,12 +22,16 @@ All `Json` methods are static and force `JSON_THROW_ON_ERROR`. `$flags` is OR-ed
 - `Json::pretty(mixed $value, int $flags = 0, int $depth = 512): string` — adds `JSON_PRETTY_PRINT`, `JSON_UNESCAPED_SLASHES`, `JSON_UNESCAPED_UNICODE`
 - `Json::decode(string $json, int $flags = 0, int $depth = 512): mixed` — objects become `stdClass`
 - `Json::array(string $json, int $flags = 0, int $depth = 512): array<array-key, mixed>`
+- `Json::arrayOrNull(string $json, int $flags = 0, int $depth = 512): array<array-key, mixed>|null` — null on a wrong shape, still throws on malformed input
 - `Json::list(string $json, int $flags = 0, int $depth = 512): list<mixed>`
 - `Json::object(string $json, int $flags = 0, int $depth = 512): stdClass`
+- `Json::objectOrNull(string $json, int $flags = 0, int $depth = 512): ?stdClass` — null on a wrong shape, still throws on malformed input
 - `Json::string(string $json, int $flags = 0, int $depth = 512): string`
 - `Json::int(string $json, int $flags = 0, int $depth = 512): int`
 - `Json::float(string $json, int $flags = 0, int $depth = 512): float` — accepts and widens ints
 - `Json::bool(string $json, int $flags = 0, int $depth = 512): bool`
+- `Json::normalize(mixed $value): array<array-key, mixed>` — deep-converts a value to plain arrays via a JSON round trip. Takes no `$flags` or `$depth`; see the README for why.
+- `Json::normalizeNullable(mixed $value): array<array-key, mixed>|null` — as above, passing a null input through
 
 ### Constants
 

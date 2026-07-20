@@ -7,6 +7,7 @@
 
 # >>> package-boost (managed) >>>
 .agents/ export-ignore
+.ai/guidelines/ export-ignore
 .cache/ export-ignore
 .cache/phpstan/ export-ignore
 .cache/phpunit/ export-ignore

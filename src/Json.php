@@ -89,6 +89,28 @@ final class Json
     }
 
     /**
+     * Decode to an associative array, or null if the JSON described something else.
+     *
+     * Malformed input still throws. Only the shape check is relaxed, for callers that
+     * treat a wrong-shaped-but-valid document as an expected condition they handle
+     * locally rather than an error. A JSON `null` is reported the same way as any other
+     * wrong shape: as null.
+     *
+     * @param int<1, max> $depth
+     *
+     * @return array<array-key, mixed>|null
+     *
+     * @throws JsonException on malformed input
+     * @throws UnsupportedJsonFlagException if JSON_OBJECT_AS_ARRAY is passed
+     */
+    public static function arrayOrNull(string $json, int $flags = 0, int $depth = 512): ?array
+    {
+        $decoded = json_decode($json, associative: true, depth: $depth, flags: self::decodeFlags($flags));
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
      * Decode to a list, asserting the JSON described an array rather than an object.
      *
      * An object whose keys are the sequential integers 0..n-1 is accepted: after decoding
@@ -129,6 +151,26 @@ final class Json
         }
 
         return $decoded;
+    }
+
+    /**
+     * Decode to a stdClass, or null if the JSON described something else.
+     *
+     * Malformed input still throws. Only the shape check is relaxed, for callers that
+     * treat a wrong-shaped-but-valid document as an expected condition they handle
+     * locally rather than an error. A JSON `null` is reported the same way as any other
+     * wrong shape: as null.
+     *
+     * @param int<1, max> $depth
+     *
+     * @throws JsonException on malformed input
+     * @throws UnsupportedJsonFlagException if JSON_OBJECT_AS_ARRAY is passed
+     */
+    public static function objectOrNull(string $json, int $flags = 0, int $depth = 512): ?stdClass
+    {
+        $decoded = self::decode($json, $flags, $depth);
+
+        return $decoded instanceof stdClass ? $decoded : null;
     }
 
     /**
@@ -210,6 +252,57 @@ final class Json
         }
 
         return $decoded;
+    }
+
+    /**
+     * Deep-convert a value into a plain associative array by round-tripping it through JSON.
+     *
+     * This is the idiom `Json::array(Json::encode($value))` written once. It flattens
+     * stdClass, nested objects, and anything implementing JsonSerializable into plain
+     * nested arrays, applying JSON's own conversion rules: only public properties survive,
+     * and INF, NAN, resources, and malformed UTF-8 throw rather than degrade.
+     *
+     * A value that does not encode to a JSON object or array — a bare scalar or null —
+     * is a shape failure, exactly as it would be through Json::array(). Use
+     * normalizeNullable() when a null input is expected.
+     *
+     * Neither $flags nor $depth is accepted, because one value cannot mean the same thing
+     * on both legs of the round trip. JSON_HEX_TAG and JSON_OBJECT_AS_ARRAY are both 1,
+     * and JSON_HEX_AMP and JSON_BIGINT_AS_STRING are both 2, so an encode flag would
+     * arrive at the decode as an unrelated decode flag.
+     *
+     * The decode leg is given 513 rather than the encoding default of 512 because the two
+     * legs count depth differently: decoding [[[1]]] needs 4 where encoding it needs 3.
+     * Matching the numbers would make normalize() reject the outermost nesting level that
+     * encode() accepts, so anything encode() can represent survives the round trip.
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws JsonException if the value cannot be encoded
+     * @throws UnexpectedJsonShapeException if the value does not encode to an object or array
+     */
+    public static function normalize(mixed $value): array
+    {
+        return self::array(self::encode($value), depth: 513);
+    }
+
+    /**
+     * Deep-convert a value into a plain associative array, passing null straight through.
+     *
+     * Named Nullable rather than OrNull because the null here is the caller's, not the
+     * document's: it relaxes what may be passed in, where arrayOrNull() and objectOrNull()
+     * relax what the JSON is allowed to contain. Only a null input yields null, so a value
+     * that encodes to JSON `null` some other way, such as a JsonSerializable returning
+     * null, is still a shape failure.
+     *
+     * @return array<array-key, mixed>|null
+     *
+     * @throws JsonException if the value cannot be encoded
+     * @throws UnexpectedJsonShapeException if the value does not encode to an object or array
+     */
+    public static function normalizeNullable(mixed $value): ?array
+    {
+        return $value === null ? null : self::normalize($value);
     }
 
     /**

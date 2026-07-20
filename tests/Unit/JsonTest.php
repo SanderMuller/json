@@ -169,6 +169,72 @@ describe('array', function (): void {
     })->throws(JsonException::class, 'Maximum stack depth exceeded');
 });
 
+describe('arrayOrNull', function (): void {
+    it('decodes an object to an associative array', function (): void {
+        expect(Json::arrayOrNull('{"a":{"b":1}}'))->toBe(['a' => ['b' => 1]]);
+    });
+
+    it('decodes a json array', function (): void {
+        expect(Json::arrayOrNull('[1,2]'))->toBe([1, 2]);
+    });
+
+    it('returns null for a scalar instead of throwing', function (): void {
+        expect(Json::arrayOrNull('"hi"'))->toBeNull();
+    });
+
+    it('reports a json null the same way as any other wrong shape', function (): void {
+        expect(Json::arrayOrNull('null'))->toBeNull();
+    });
+
+    it('still throws on malformed json, because that is bad data rather than a shape', function (): void {
+        Json::arrayOrNull('{');
+    })->throws(JsonException::class, 'Syntax error');
+
+    it('still throws on an empty string', function (): void {
+        Json::arrayOrNull('');
+    })->throws(JsonException::class, 'Syntax error');
+
+    it('forwards caller-supplied flags', function (): void {
+        expect(Json::arrayOrNull('{"big":12345678901234567890}', JSON_BIGINT_AS_STRING))
+            ->toBe(['big' => '12345678901234567890']);
+    });
+
+    it('forwards the depth', function (): void {
+        Json::arrayOrNull('[[[1]]]', depth: 3);
+    })->throws(JsonException::class, 'Maximum stack depth exceeded');
+});
+
+describe('objectOrNull', function (): void {
+    it('decodes an object', function (): void {
+        expect(Json::objectOrNull('{"a":1}')?->a)->toBe(1);
+    });
+
+    it('returns null for a json array instead of throwing', function (): void {
+        expect(Json::objectOrNull('[1,2]'))->toBeNull();
+    });
+
+    it('returns null for a scalar instead of throwing', function (): void {
+        expect(Json::objectOrNull('"hi"'))->toBeNull();
+    });
+
+    it('reports a json null the same way as any other wrong shape', function (): void {
+        expect(Json::objectOrNull('null'))->toBeNull();
+    });
+
+    it('still throws on malformed json, because that is bad data rather than a shape', function (): void {
+        Json::objectOrNull('{');
+    })->throws(JsonException::class, 'Syntax error');
+
+    it('forwards caller-supplied flags', function (): void {
+        expect(Json::objectOrNull('{"big":12345678901234567890}', JSON_BIGINT_AS_STRING)?->big)
+            ->toBe('12345678901234567890');
+    });
+
+    it('forwards the depth', function (): void {
+        Json::objectOrNull('{"a":{"b":{"c":1}}}', depth: 3);
+    })->throws(JsonException::class, 'Maximum stack depth exceeded');
+});
+
 describe('list', function (): void {
     it('decodes a json array to a list', function (): void {
         expect(Json::list('["a","b"]'))->toBe(['a', 'b']);
@@ -308,8 +374,10 @@ describe('JSON_OBJECT_AS_ARRAY', function (): void {
         match ($method) {
             'decode' => Json::decode('{"a":1}', JSON_OBJECT_AS_ARRAY),
             'array' => Json::array('{"a":1}', JSON_OBJECT_AS_ARRAY),
+            'arrayOrNull' => Json::arrayOrNull('{"a":1}', JSON_OBJECT_AS_ARRAY),
             'list' => Json::list('{"a":1}', JSON_OBJECT_AS_ARRAY),
             'object' => Json::object('{"a":1}', JSON_OBJECT_AS_ARRAY),
+            'objectOrNull' => Json::objectOrNull('{"a":1}', JSON_OBJECT_AS_ARRAY),
             'string' => Json::string('{"a":1}', JSON_OBJECT_AS_ARRAY),
             'int' => Json::int('{"a":1}', JSON_OBJECT_AS_ARRAY),
             'float' => Json::float('{"a":1}', JSON_OBJECT_AS_ARRAY),
@@ -317,12 +385,142 @@ describe('JSON_OBJECT_AS_ARRAY', function (): void {
             default => throw new LogicException("Unhandled method {$method}."),
         };
     })
-        ->with(['decode', 'array', 'list', 'object', 'string', 'int', 'float', 'bool'])
+        ->with(['decode', 'array', 'arrayOrNull', 'list', 'object', 'objectOrNull', 'string', 'int', 'float', 'bool'])
         ->throws(UnsupportedJsonFlagException::class, 'JSON_OBJECT_AS_ARRAY cannot be honoured');
 
     it('points a porter at the right replacement', function (): void {
         Json::decode('{"a":1}', JSON_OBJECT_AS_ARRAY);
     })->throws(UnsupportedJsonFlagException::class, 'The replacement is Json::array($json)');
+});
+
+describe('normalize', function (): void {
+    it('flattens a nested stdClass into plain arrays', function (): void {
+        $value = new stdClass();
+        $value->a = 1;
+        $value->b = new stdClass();
+        $value->b->c = 2;
+
+        expect(Json::normalize($value))->toBe(['a' => 1, 'b' => ['c' => 2]]);
+    });
+
+    it('passes an array through unchanged', function (): void {
+        expect(Json::normalize(['a' => ['b' => 1]]))->toBe(['a' => ['b' => 1]]);
+    });
+
+    it('keeps a list a list', function (): void {
+        expect(Json::normalize([1, 2, 3]))->toBe([1, 2, 3]);
+    });
+
+    it('normalises an empty array', function (): void {
+        expect(Json::normalize([]))->toBeArray()
+            ->toBeEmpty();
+    });
+
+    it('accepts every nesting level that encode() accepts, despite the depth asymmetry between the legs', function (): void {
+        $value = 1;
+
+        for ($i = 0; $i < 512; ++$i) {
+            $value = [$value];
+        }
+
+        expect(Json::encode($value))->toBeString()
+            ->and(Json::normalize($value))
+            ->toBeArray();
+    });
+
+    it('flattens a JsonSerializable through its jsonSerialize()', function (): void {
+        $value = new class implements JsonSerializable {
+            /**
+             * @return array<string, string>
+             */
+            public function jsonSerialize(): array
+            {
+                return ['from' => 'jsonSerialize'];
+            }
+        };
+
+        expect(Json::normalize($value))->toBe(['from' => 'jsonSerialize']);
+    });
+
+    it('keeps only the public properties of a plain object, as JSON encoding does', function (): void {
+        $value = new class {
+            public string $pub = 'x';
+
+            protected string $prot = 'y';
+
+            private string $priv = 'z';
+
+            public function priv(): string
+            {
+                return $this->priv;
+            }
+        };
+
+        expect(Json::normalize($value))->toBe(['pub' => 'x']);
+    });
+
+    it('rejects a scalar, which does not encode to an object or array', function (): void {
+        Json::normalize('hi');
+    })->throws(UnexpectedJsonShapeException::class, 'Expected the JSON to decode to an array, got string.');
+
+    it('rejects null', function (): void {
+        Json::normalize(null);
+    })->throws(UnexpectedJsonShapeException::class, 'Expected the JSON to decode to an array, got null.');
+
+    it('rejects a JsonSerializable that returns a scalar', function (): void {
+        $value = new class implements JsonSerializable {
+            public function jsonSerialize(): string
+            {
+                return 'scalar';
+            }
+        };
+
+        Json::normalize($value);
+    })->throws(UnexpectedJsonShapeException::class, 'Expected the JSON to decode to an array, got string.');
+
+    it('throws on a value that cannot be encoded', function (): void {
+        Json::normalize(['n' => NAN]);
+    })->throws(JsonException::class);
+
+    it('throws on invalid utf-8 rather than dropping it', function (): void {
+        Json::normalize(['a' => "\xB1\x31"]);
+    })->throws(JsonException::class, 'Malformed UTF-8 characters, possibly incorrectly encoded');
+
+    it('throws on a type it cannot represent', function (): void {
+        Json::normalize(['r' => fopen('php://memory', 'r')]);
+    })->throws(JsonException::class, 'Type is not supported');
+});
+
+describe('normalizeNullable', function (): void {
+    it('passes a null input straight through', function (): void {
+        expect(Json::normalizeNullable(null))->toBeNull();
+    });
+
+    it('normalises a stdClass exactly as normalize() does', function (): void {
+        $value = new stdClass();
+        $value->a = 1;
+
+        expect(Json::normalizeNullable($value))->toBe(['a' => 1]);
+    });
+
+    it('normalises an array', function (): void {
+        expect(Json::normalizeNullable(['a' => 1]))->toBe(['a' => 1]);
+    });
+
+    it('still rejects a scalar, since only a null input is excused', function (): void {
+        Json::normalizeNullable('hi');
+    })->throws(UnexpectedJsonShapeException::class, 'Expected the JSON to decode to an array, got string.');
+
+    it("rejects a JsonSerializable returning null, because the null is the document's and not the caller's", function (): void {
+        $value = new class implements JsonSerializable {
+            public function jsonSerialize(): mixed
+            {
+                return null;
+            }
+        };
+
+        Json::normalizeNullable($value);
+    })->throws(UnexpectedJsonShapeException::class, 'Expected the JSON to decode to an array, got null.');
 });
 
 describe('round trip', function (): void {

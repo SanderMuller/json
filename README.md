@@ -47,6 +47,34 @@ Json::decode($raw);           // mixed  (when the shape is genuinely unknown)
 
 `Json::list()` is the one that pays for itself under PHPStan: `json_decode($json, true)` gives you `array`, which is not a `list`, so a `@return list<T>` signature forces a redundant `array_values()`. `Json::list()` returns `list<mixed>` directly.
 
+### When a wrong shape is expected
+
+Sometimes a valid-JSON-but-wrong-shape value is a case you handle rather than an error. `arrayOrNull()` and `objectOrNull()` relax the shape check only:
+
+```php
+Json::arrayOrNull('"hi"');    // null
+Json::objectOrNull('[1,2]');  // null
+Json::arrayOrNull('{');       // still throws: malformed input is bad data, not a shape
+```
+
+A JSON `null` comes back as `null` too, the same as any other shape that is not the one you asked for. Only these two exist, because a null fallback for a bare `string` or `int` has no callers.
+
+### Normalising a value
+
+`Json::normalize()` deep-converts a value into plain nested arrays by round-tripping it through JSON. It replaces the `Json::array(Json::encode($value))` idiom:
+
+```php
+Json::normalize($stdClass);           // array<array-key, mixed>
+Json::normalize($jsonSerializable);   // whatever jsonSerialize() returns, flattened
+Json::normalizeNullable(null);        // null
+```
+
+JSON's own rules apply: only public properties survive, and `INF`, `NAN`, resources, and malformed UTF-8 throw rather than degrade. A value that does not encode to an object or array is a shape failure, exactly as it would be through `Json::array()`. `normalizeNullable()` excuses a null input and nothing else.
+
+Neither method takes `$flags` or `$depth`, because one value cannot mean the same thing on both legs of a round trip. `JSON_HEX_TAG` and `JSON_OBJECT_AS_ARRAY` are both `1`, and `JSON_HEX_AMP` and `JSON_BIGINT_AS_STRING` are both `2`, so an encode flag would arrive at the decode as an unrelated decode flag. Do the round trip by hand if you need that control.
+
+The legs also count `$depth` differently: decoding `[[[1]]]` needs `4` where encoding it needs `3`. `normalize()` gives the decode leg one extra level so that anything `Json::encode()` can represent survives the round trip, rather than rejecting the outermost nesting level that encoding accepts.
+
 ### Errors
 
 A shape mismatch throws `UnexpectedJsonShapeException`, which extends the native `JsonException`. One catch covers both malformed JSON and an unexpected shape:
