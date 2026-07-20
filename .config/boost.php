@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use SanderMuller\BoostCore\Config\BoostConfig;
 use SanderMuller\BoostCore\Enums\Agent;
+use SanderMuller\BoostCore\Enums\Tag;
 
 /**
  * boost-core configuration — which AI agents `vendor/bin/boost sync` writes to,
@@ -31,9 +32,16 @@ return BoostConfig::configure()
         Agent::CODEX,
     ])
     ->withAllowedVendors([
+        'sandermuller/boost-core',
         'sandermuller/boost-skills',
         'sandermuller/package-boost-laravel',
         'sandermuller/package-boost-php',
     ])
-    ->withTags(['php', 'github'])
+    ->withTags([
+        Tag::Php,
+        Tag::Laravel,
+        Tag::Github,
+        'release-automation',
+        Tag::Pest,
+    ])
     ->withDisabledEmitters([]);

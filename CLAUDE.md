@@ -1,3 +1,84 @@
+# Anonymize Fixtures, Docs, and Specs
+
+This is a **public, open-source repository**. Test fixtures, the rule
+`CodeSample` heredocs in `src/`, the snippets in `README.md` / `docs/`, and the
+spec files in `specs/` are all world-readable on GitHub — and `src/` plus the
+README also ship in the Composer dist archive. `/tests` is `export-ignore`d, but
+that only trims the archive; it hides nothing on GitHub. Doc examples and specs
+are the easy things to forget precisely because they are not "fixtures" — they
+leak just the same.
+
+Every example — fixture, `CodeSample`, doc snippet, or spec — must be
+**synthetic**. Never copy proprietary application code — from hihaho or any
+consumer/dogfooding codebase — into one. Reconstruct the smallest generic
+example that demonstrates the rule, then strip every domain detail not needed
+to make the point.
+
+This keeps internal domain models, naming, business terms, and logic out of a
+public artifact, and it makes for better examples: the transformation stands
+out instead of being buried in incidental domain noise.
+
+## Anonymize these
+
+- **Class and namespace names** — use framework-conventional placeholders
+  (`App\Models\Article`, `App\Http\Resources\PostResource`). Don't reach for
+  the product's real domain entities.
+- **Variable, property, and method names** that carry domain meaning.
+- **String literals** — route paths, table and column names, config keys,
+  labels, messages. Invent neutral values; never paste a real schema column
+  or route key.
+- **Business terminology and comments** lifted from real code.
+- **Logic and control flow** that mirrors a real implementation.
+
+## Keep these — they are not leaks
+
+- **Framework and vendor public symbols** (`Illuminate\…`, `Route`,
+  `Blueprint`, `JsonResource`, `Model`). The rule usually has to match these
+  to fire, and they are public API.
+- **Generic example nouns** — `User`, `Post`, `Order`, `Article`, `Comment`.
+- **The convention the rule enforces** (suffixes, alias targets, flag-column
+  names). That is the package's public contract, not proprietary.
+
+## Specs leak provenance, not just code
+
+A spec in `specs/` rarely contains a real schema column — its leak vector is
+**provenance metadata** describing where the work came from. Scrub all of it:
+
+- **Internal PR / issue / ticket numbers** ("modelled on PR #1234",
+  "ABC-123"). Describe the *change* generically ("a manual code-style cleanup")
+  instead of citing the source. (Don't reference a real PR number here either —
+  these examples are deliberately fake.)
+- **Employee names, handles, and authorship** of the originating work.
+- **Real domain method / class names** copied from the source change, even in
+  prose (e.g. "the source change's `recalculateScore()`/`markProcessed()`
+  calls"). Use the same neutral placeholders the spec's code examples use.
+- **Dogfooding / consumer-app references** ("from the hihaho app", file/line
+  counts of a private PR).
+
+State *what* the rule does and *why*, never *which internal change or person*
+it came from.
+
+## Rule of thumb
+
+An example should read like a generic framework tutorial snippet, not like a
+slice of one company's application. If a reader could tell which product it
+came from, anonymize further — prefer a neutral noun (`Article`, `Order`) over
+an actual product entity (e.g. `Video`, `caliper`, `adaptiveLearning`).
+
+## When adding or editing a fixture, doc example, or spec
+
+1. Keep only the framework symbols the rule matches against.
+2. Replace real names and strings with neutral equivalents.
+3. For a fixture, run the test to confirm the rule still fires
+   (`vendor/bin/pest path/to/RuleTest.php`); for a `CodeSample` or README
+   snippet, keep it consistent with the rule it documents; for a spec, strip
+   provenance (see "Specs leak provenance" above).
+4. Before committing, scan the diff for product names, real table/column
+   names, domain jargon, and internal PR/ticket/person references — across
+   `specs/`, `README.md`, and `docs/` too, not only `tests/` and `src/`.
+
+---
+
 ## AskUserQuestion Phrasing
 
 When writing an `AskUserQuestion` question, option labels, or option descriptions, **avoid first- and second-person pronouns** — `I`, `me`, `my`, `we`, `our`, `you`, `your`. In that tool the user is reading a question *from* the assistant and answering it, so the roles are inverted and these pronouns are ambiguous: the reader cannot tell whether `I`/`my` means the assistant or themselves, nor whether `you`/`your` means them or the assistant.
@@ -191,3 +272,41 @@ explicitly requested or when a behaviour change requires it.
 
 Be concise. Focus on what changed and why. Skip restating what the
 diff already shows.
+
+---
+
+# Release Automation
+
+Conventions the package-boost family shares for release flow. The
+procedural detail lives in the `pre-release` and `release-notes`
+skills — loaded on-demand, not pinned here.
+
+## CHANGELOG is CI-managed
+
+`.github/workflows/update-changelog.yml` prepends the release body to
+`CHANGELOG.md` on `release: released` and commits to the release's
+target branch (typically `main`). Don't hand-edit `CHANGELOG.md` as
+part of a release. Post-release typo fixes are committed directly.
+
+## Release notes live in `internal/release-notes-<version>.md`
+
+`internal/` is gitignored — drafts stay local. The notes file becomes
+the release body. The first line pins the green commit so the pre-tag
+gate can fail closed on drift:
+
+```
+<!-- verified-sha: <full sha> -->
+```
+
+## Tag and title
+
+- Tag: bare version (`0.7.0`) — Composer and Packagist read the tag.
+- Release title: `v`-prefixed (`v0.7.0`) — cosmetic.
+- Notes file: bare (`internal/release-notes-0.7.0.md`).
+
+## Agent handoff
+
+Agents stop at the ready-to-tag handoff. The user runs the pre-tag
+gate and publishes the release (GitHub UI, `gh`, or otherwise). See
+the `pre-release` skill for the full procedure and the no-release-create
+rule.
