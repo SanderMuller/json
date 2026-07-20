@@ -21,7 +21,7 @@ Requires PHP 8.3+. No runtime dependencies.
 
 ## Usage
 
-Every method throws on malformed input. There is no silent `false` or `null` to forget to check. The two flags that would undermine that (`JSON_PARTIAL_OUTPUT_ON_ERROR` on encode, `JSON_OBJECT_AS_ARRAY` on decode) are rejected rather than silently ignored.
+Every method throws on malformed input, so there is no silent `false` or `null` to forget to check. The two flags that would undermine that (`JSON_PARTIAL_OUTPUT_ON_ERROR` on encode, `JSON_OBJECT_AS_ARRAY` on decode) are rejected rather than silently ignored. Two methods do return `null` for a wrong shape, and their names say so.
 
 ```php
 use SanderMuller\Json\Json;
@@ -49,7 +49,7 @@ Json::decode($raw);           // mixed  (when the shape is genuinely unknown)
 
 ### When a wrong shape is expected
 
-Sometimes a valid-JSON-but-wrong-shape value is a case you handle rather than an error. `arrayOrNull()` and `objectOrNull()` relax the shape check only:
+Sometimes the JSON parses fine but holds the wrong shape, and that is a case you handle locally. `arrayOrNull()` and `objectOrNull()` relax the shape check and leave everything else alone:
 
 ```php
 Json::arrayOrNull('"hi"');    // null
@@ -69,11 +69,11 @@ Json::normalize($jsonSerializable);   // whatever jsonSerialize() returns, flatt
 Json::normalizeNullable(null);        // null
 ```
 
-JSON's own rules apply: only public properties survive, and `INF`, `NAN`, resources, and malformed UTF-8 throw rather than degrade. A value that does not encode to an object or array is a shape failure, exactly as it would be through `Json::array()`. `normalizeNullable()` excuses a null input and nothing else.
+JSON's own rules apply: only public properties survive, and `INF`, `NAN`, resources, and malformed UTF-8 all throw. A value that does not encode to an object or array is a shape failure, exactly as it would be through `Json::array()`. `normalizeNullable()` excuses a null input; everything else still fails.
 
 Neither method takes `$flags` or `$depth`, because one value cannot mean the same thing on both legs of a round trip. `JSON_HEX_TAG` and `JSON_OBJECT_AS_ARRAY` are both `1`, and `JSON_HEX_AMP` and `JSON_BIGINT_AS_STRING` are both `2`, so an encode flag would arrive at the decode as an unrelated decode flag. Do the round trip by hand if you need that control.
 
-The legs also count `$depth` differently: decoding `[[[1]]]` needs `4` where encoding it needs `3`. `normalize()` gives the decode leg one extra level so that anything `Json::encode()` can represent survives the round trip, rather than rejecting the outermost nesting level that encoding accepts.
+The legs also count `$depth` differently: decoding `[[[1]]]` needs `4` where encoding it needs `3`. `normalize()` gives its decode leg one extra level, so anything `Json::encode()` can represent survives the round trip. Matching the numbers would have quietly cost you the outermost nesting level.
 
 ### Errors
 
@@ -134,6 +134,10 @@ The exception type changed. Guzzle threw `GuzzleHttp\Exception\InvalidArgumentEx
 composer test
 composer qa
 ```
+
+## Changelog
+
+[CHANGELOG.md](https://github.com/sandermuller/json/blob/main/CHANGELOG.md) has the release history. [PUBLIC_API.md](PUBLIC_API.md) lists the semver-protected surface, so you can tell which changes are breaking.
 
 ## License
 
